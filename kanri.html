@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AGREE II 評価ツール 管理画面</title>
+<style>
+  :root {
+    --main-color: #2c5f8a;
+    --accent-color: #e07a1f;
+    --danger-color: #c0392b;
+    --bg-color: #f5f7fa;
+    --border-color: #d8dee5;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
+    background: var(--bg-color);
+    margin: 0;
+    padding: 0;
+    color: #222;
+    line-height: 1.6;
+  }
+  header {
+    background: var(--main-color);
+    color: white;
+    padding: 16px 20px;
+  }
+  header h1 { margin: 0; font-size: 1.3em; }
+  header p { margin: 6px 0 0; font-size: 0.85em; opacity: 0.9; }
+
+  .container { max-width: 640px; margin: 0 auto; padding: 16px; }
+
+  .panel {
+    background: white;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 18px;
+    margin-bottom: 18px;
+  }
+  .panel h2 { margin-top: 0; font-size: 1.05em; color: var(--main-color); }
+  .panel.danger h2 { color: var(--danger-color); }
+
+  label { display: block; font-weight: bold; margin-bottom: 6px; }
+  input[type="text"], select {
+    width: 100%;
+    font-size: 1em;
+    padding: 9px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    margin-bottom: 16px;
+  }
+
+  button {
+    font-size: 1em;
+    padding: 10px 20px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+  }
+  #saveConfigBtn { background: var(--main-color); color: white; }
+  #refreshBtn { background: var(--danger-color); color: white; }
+  button:disabled { opacity: 0.6; cursor: not-allowed; }
+
+  #configMsg, #refreshMsg { margin-top: 10px; font-size: 0.9em; padding: 8px 10px; border-radius: 6px; display: none; }
+  .msg-ok { background: #e2f5e9; color: #1f7a3d; display: block !important; }
+  .msg-error { background: #fdeaea; color: var(--danger-color); display: block !important; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.88em; margin-top: 10px; }
+  th, td { border: 1px solid var(--border-color); padding: 6px 8px; text-align: center; }
+  th { background: #eef4fa; }
+  .status-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 0.85em; }
+  .status-confirmed { background: #e2f5e9; color: #1f7a3d; }
+  .status-draft { background: #fff3e0; color: #a05a00; }
+
+  .hint { font-size: 0.82em; color: #666; margin-top: -6px; margin-bottom: 14px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>AGREE II 評価ツール 管理画面</h1>
+  <p>このページは勉強会の主催者専用です。評価者にはこのURLを共有しないでください。</p>
+</header>
+
+<div class="container">
+
+  <div class="panel">
+    <h2>1. 勉強会の設定</h2>
+    <label for="guidelineInput">評価対象のガイドライン名</label>
+    <input type="text" id="guidelineInput" placeholder="例: ○○診療ガイドライン2026年版">
+
+    <label for="groupCountSelect">班数</label>
+    <select id="groupCountSelect">
+      <option value="2">2班</option>
+      <option value="3">3班</option>
+      <option value="4">4班</option>
+    </select>
+    <p class="hint">班数はAGREE IIが推奨する評価者数(最低2名、望ましくは4名)に対応しています。</p>
+
+    <button id="saveConfigBtn">この内容で保存する</button>
+    <div id="configMsg"></div>
+  </div>
+
+  <div class="panel">
+    <h2>2. 現在の回答状況</h2>
+    <table id="statusTable">
+      <thead><tr><th>班</th><th>状態</th><th>最終更新</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <button id="reloadStatusBtn" style="margin-top:12px; background:white; border:1.5px solid var(--main-color); color:var(--main-color);">状況を再読み込み</button>
+  </div>
+
+  <div class="panel danger">
+    <h2>3. 新しい勉強会を開始する</h2>
+    <p>勉強会が完全に終わったら、このボタンを押してください。今回の全班の回答が「評価履歴」に保存されたうえで、回答エリアがクリアされ、次の勉強会の準備が整います。<strong>この操作は取り消せません。</strong></p>
+    <button id="refreshBtn">履歴に保存して新しい勉強会を開始する</button>
+    <div id="refreshMsg"></div>
+  </div>
+
+</div>
+
+<script>
+// ==== 設定: デプロイ後、あなたのGAS Web AプリのURLに書き換えてください ====
+var API_URL = "YOUR_WEB_APP_URL_HERE";
+
+var latestResponses = [];
+var latestGroupCount = 4;
+
+function loadCurrentState() {
+  fetch(API_URL + '?action=all')
+    .then(function (res) { return res.json(); })
+    .then(function (data) {
+      if (!data.ok) throw new Error(data.error || 'load failed');
+      document.getElementById('guidelineInput').value = data.config.guidelineName || '';
+      document.getElementById('groupCountSelect').value = String(data.config.groupCount);
+      latestGroupCount = data.config.groupCount;
+      latestResponses = data.responses;
+      renderStatusTable(data.config.groupCount, data.responses);
+    })
+    .catch(function (err) {
+      showMsg('configMsg', '現在の設定の読み込みに失敗しました。API URLの設定を確認してください。(' + err + ')', true);
+      console.error(err);
+    });
+}
+
+function renderStatusTable(groupCount, responses) {
+  var byGroup = {};
+  responses.forEach(function (r) { byGroup[String(r['班'])] = r; });
+
+  var tbody = document.querySelector('#statusTable tbody');
+  tbody.innerHTML = '';
+  for (var i = 1; i <= groupCount; i++) {
+    var r = byGroup[String(i)];
+    var tr = document.createElement('tr');
+    if (!r) {
+      tr.innerHTML = '<td>' + i + '班</td><td><span class="status-badge">未回答</span></td><td>-</td>';
+    } else {
+      var cls = r['ステータス'] === '確定' ? 'status-confirmed' : 'status-draft';
+      var updated = r['更新日時'] ? new Date(r['更新日時']).toLocaleString('ja-JP') : '-';
+      tr.innerHTML =
+        '<td>' + i + '班</td>' +
+        '<td><span class="status-badge ' + cls + '">' + (r['ステータス'] || '未回答') + '</span></td>' +
+        '<td>' + updated + '</td>';
+    }
+    tbody.appendChild(tr);
+  }
+}
+
+function showMsg(elId, text, isError) {
+  var el = document.getElementById(elId);
+  el.textContent = text;
+  el.className = isError ? 'msg-error' : 'msg-ok';
+}
+
+document.getElementById('saveConfigBtn').addEventListener('click', function () {
+  var btn = this;
+  var guidelineName = document.getElementById('guidelineInput').value.trim();
+  var groupCount = document.getElementById('groupCountSelect').value;
+
+  if (!guidelineName) {
+    showMsg('configMsg', 'ガイドライン名を入力してください。', true);
+    return;
+  }
+
+  btn.disabled = true;
+  fetch(API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ action: 'updateConfig', guidelineName: guidelineName, groupCount: groupCount })
+  })
+    .then(function (res) { return res.json(); })
+    .then(function (data) {
+      if (!data.ok) throw new Error(data.error || 'save failed');
+      showMsg('configMsg', '保存しました。評価フォーム・ダッシュボードに反映されます。', false);
+      loadCurrentState();
+    })
+    .catch(function (err) {
+      showMsg('configMsg', '保存に失敗しました。(' + err + ')', true);
+      console.error(err);
+    })
+    .finally(function () { btn.disabled = false; });
+});
+
+document.getElementById('reloadStatusBtn').addEventListener('click', loadCurrentState);
+
+document.getElementById('refreshBtn').addEventListener('click', function () {
+  var hasDraft = latestResponses.some(function (r) { return r['ステータス'] !== '確定'; });
+  var hasAny = latestResponses.length > 0;
+
+  if (!hasAny) {
+    showMsg('refreshMsg', 'まだ回答データがありません。リフレッシュする必要はありません。', true);
+    return;
+  }
+
+  var message = hasDraft
+    ? 'まだ「一時保存(下書き)」のままの班があります。このままリフレッシュすると、下書きの内容も履歴に保存されたうえで、回答エリアがクリアされます。続行しますか？'
+    : '現在のデータを履歴に保存し、回答エリアをクリアして新しい勉強会を始めます。よろしいですか？';
+
+  if (!confirm(message)) return;
+
+  var btn = this;
+  btn.disabled = true;
+  fetch(API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ action: 'refresh' })
+  })
+    .then(function (res) { return res.json(); })
+    .then(function (data) {
+      if (!data.ok) throw new Error(data.error || 'refresh failed');
+      showMsg('refreshMsg', data.result.message + ' 次の勉強会の準備ができました。ガイドライン名を更新したい場合は上の「1. 勉強会の設定」から変更してください。', false);
+      loadCurrentState();
+    })
+    .catch(function (err) {
+      showMsg('refreshMsg', '実行に失敗しました。(' + err + ')', true);
+      console.error(err);
+    })
+    .finally(function () { btn.disabled = false; });
+});
+
+loadCurrentState();
+</script>
+
+</body>
+</html>

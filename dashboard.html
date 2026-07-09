@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AGREE II 評価ダッシュボード</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  :root {
+    --main-color: #2c5f8a;
+    --accent-color: #e07a1f;
+    --bg-color: #f5f7fa;
+    --border-color: #d8dee5;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
+    background: var(--bg-color);
+    margin: 0;
+    padding: 0;
+    color: #222;
+  }
+  header {
+    background: var(--main-color);
+    color: white;
+    padding: 16px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  header h1 { margin: 0; font-size: 1.3em; }
+  header p { margin: 4px 0 0; font-size: 0.9em; opacity: 0.9; }
+  .header-actions button {
+    font-size: 0.95em;
+    padding: 8px 16px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    background: var(--accent-color);
+    color: white;
+  }
+  .header-actions button:disabled { opacity: 0.6; cursor: not-allowed; }
+
+  .container { max-width: 900px; margin: 0 auto; padding: 16px; }
+
+  .panel {
+    background: white;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  .panel h2 { margin-top: 0; font-size: 1.05em; color: var(--main-color); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.9em; }
+  th, td { border: 1px solid var(--border-color); padding: 6px 8px; text-align: center; }
+  th { background: #eef4fa; }
+  td.group-col, th.group-col { text-align: left; }
+
+  #loadingMsg { padding: 30px; text-align: center; color: #666; }
+  #errorMsg { padding: 16px; color: #a00; display: none; }
+
+  .status-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.78em;
+  }
+  .status-confirmed { background: #e2f5e9; color: #1f7a3d; }
+  .status-draft { background: #fff3e0; color: #a05a00; }
+
+  canvas { max-width: 100%; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>AGREE II 評価ダッシュボード</h1>
+    <p id="guidelineLine">読み込み中...</p>
+  </div>
+  <div class="header-actions">
+    <button id="reloadBtn">再読み込み</button>
+    <button id="pdfBtn">PDFで保存</button>
+  </div>
+</header>
+
+<div class="container">
+  <div id="loadingMsg">データを読み込んでいます...</div>
+  <div id="errorMsg"></div>
+
+  <div id="pdfArea" style="display:none;">
+    <div class="panel">
+      <h2>班ごとの全体評価</h2>
+      <table id="overallTable">
+        <thead>
+          <tr><th class="group-col">班</th><th>ステータス</th><th>全体的な質(1〜7)</th><th>使用の推奨</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div class="panel">
+      <h2>ドメイン別スコア(%)</h2>
+      <canvas id="domainChart" height="260"></canvas>
+    </div>
+
+    <div class="panel">
+      <h2>ドメイン別スコア 詳細表</h2>
+      <table id="domainTable">
+        <thead><tr id="domainTableHead"></tr></thead>
+        <tbody id="domainTableBody"></tbody>
+      </table>
+      <p style="font-size:0.8em;color:#666;">スコアは「確定」ステータスの班のみを対象に、AGREE II使用の手引きに準拠した計算式((獲得評点−最低評点)/(最高評点−最低評点)×100)で算出しています。</p>
+    </div>
+  </div>
+</div>
+
+<script>
+// ==== 設定: デプロイ後、あなたのGAS Web AプリのURLに書き換えてください ====
+var API_URL = "YOUR_WEB_APP_URL_HERE";
+
+var DOMAIN_DEFS = [
+  { name: "領域1 対象と目的", items: [1, 2, 3] },
+  { name: "領域2 利害関係者の参加", items: [4, 5, 6] },
+  { name: "領域3 作成の厳密さ", items: [7, 8, 9, 10, 11, 12, 13, 14] },
+  { name: "領域4 提示の明確さ", items: [15, 16, 17] },
+  { name: "領域5 適用可能性", items: [18, 19, 20, 21] },
+  { name: "領域6 編集の独立性", items: [22, 23] }
+];
+
+var chartInstance = null;
+
+function loadDashboard() {
+  document.getElementById('loadingMsg').style.display = 'block';
+  document.getElementById('errorMsg').style.display = 'none';
+  document.getElementById('pdfArea').style.display = 'none';
+
+  fetch(API_URL + '?action=all')
+    .then(function (res) { return res.json(); })
+    .then(function (data) {
+      if (!data.ok) throw new Error(data.error || 'load failed');
+      render(data.config, data.responses);
+    })
+    .catch(function (err) {
+      document.getElementById('loadingMsg').style.display = 'none';
+      var errEl = document.getElementById('errorMsg');
+      errEl.style.display = 'block';
+      errEl.textContent = 'データの読み込みに失敗しました。API_URLの設定、またはネット接続を確認してください。(' + err + ')';
+      console.error(err);
+    });
+}
+
+function render(config, responses) {
+  document.getElementById('guidelineLine').textContent =
+    '評価対象ガイドライン: ' + (config.guidelineName || '(未設定)') + ' / 班数: ' + config.groupCount;
+
+  document.getElementById('loadingMsg').style.display = 'none';
+  document.getElementById('pdfArea').style.display = 'block';
+
+  renderOverallTable(responses);
+  var confirmedResponses = responses.filter(function (r) { return r['ステータス'] === '確定'; });
+  var domainScoresByGroup = responses.map(function (r) { return { group: r['班'], status: r['ステータス'], scores: computeDomainScores([r]) }; });
+  var combinedScores = computeDomainScores(confirmedResponses);
+
+  renderDomainChart(domainScoresByGroup, combinedScores);
+  renderDomainTable(domainScoresByGroup, combinedScores);
+}
+
+function renderOverallTable(responses) {
+  var tbody = document.querySelector('#overallTable tbody');
+  tbody.innerHTML = '';
+  if (responses.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="4">まだ回答がありません。</td></tr>';
+    return;
+  }
+  responses.forEach(function (r) {
+    var tr = document.createElement('tr');
+    var statusClass = r['ステータス'] === '確定' ? 'status-confirmed' : 'status-draft';
+    tr.innerHTML =
+      '<td class="group-col">' + escapeHtml(r['班']) + '班</td>' +
+      '<td><span class="status-badge ' + statusClass + '">' + escapeHtml(r['ステータス'] || '未回答') + '</span></td>' +
+      '<td>' + escapeHtml(r['全体評価_質']) + '</td>' +
+      '<td>' + escapeHtml(r['全体評価_推奨']) + '</td>';
+    tbody.appendChild(tr);
+  });
+}
+
+/**
+ * responsesSubset: 対象とする回答行の配列(通常は「確定」のみ、または単一班)
+ * 戻り値: ドメイン名をキーに、パーセントスコアを持つオブジェクト
+ */
+function computeDomainScores(responsesSubset) {
+  var result = {};
+  DOMAIN_DEFS.forEach(function (domain) {
+    var n = responsesSubset.length;
+    if (n === 0) {
+      result[domain.name] = null;
+      return;
+    }
+    var itemCount = domain.items.length;
+    var sum = 0;
+    var validRaterCount = 0;
+    responsesSubset.forEach(function (r) {
+      var raterSum = 0;
+      var raterHasAll = true;
+      domain.items.forEach(function (itemN) {
+        var v = r['項目' + itemN + '_評点'];
+        if (v === '' || v === undefined || v === null) {
+          raterHasAll = false;
+        } else {
+          raterSum += Number(v);
+        }
+      });
+      if (raterHasAll) {
+        sum += raterSum;
+        validRaterCount++;
+      }
+    });
+    if (validRaterCount === 0) {
+      result[domain.name] = null;
+      return;
+    }
+    var maxScore = 7 * itemCount * validRaterCount;
+    var minScore = 1 * itemCount * validRaterCount;
+    var pct = ((sum - minScore) / (maxScore - minScore)) * 100;
+    result[domain.name] = Math.round(pct * 10) / 10;
+  });
+  return result;
+}
+
+function renderDomainChart(domainScoresByGroup, combinedScores) {
+  var ctx = document.getElementById('domainChart').getContext('2d');
+  var labels = DOMAIN_DEFS.map(function (d) { return d.name; });
+
+  var datasets = domainScoresByGroup.map(function (g, idx) {
+    return {
+      label: g.group + '班',
+      data: labels.map(function (l) { return g.scores[l]; }),
+      backgroundColor: colorForIndex(idx, 0.5),
+      borderColor: colorForIndex(idx, 1),
+      borderWidth: 1
+    };
+  });
+
+  datasets.push({
+    label: '合計(確定済み班)',
+    data: labels.map(function (l) { return combinedScores[l]; }),
+    backgroundColor: 'rgba(44,95,138,0.85)',
+    borderColor: '#2c5f8a',
+    borderWidth: 2
+  });
+
+  if (chartInstance) chartInstance.destroy();
+  chartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: { labels: labels, datasets: datasets },
+    options: {
+      responsive: true,
+      scales: { y: { beginAtZero: true, max: 100, title: { display: true, text: 'スコア(%)' } } },
+      plugins: { legend: { position: 'bottom' } }
+    }
+  });
+}
+
+function renderDomainTable(domainScoresByGroup, combinedScores) {
+  var head = document.getElementById('domainTableHead');
+  head.innerHTML = '<th class="group-col">班</th>' + DOMAIN_DEFS.map(function (d) { return '<th>' + d.name.replace('領域', '') + '</th>'; }).join('');
+
+  var body = document.getElementById('domainTableBody');
+  body.innerHTML = '';
+
+  domainScoresByGroup.forEach(function (g) {
+    var tr = document.createElement('tr');
+    var cells = '<td class="group-col">' + escapeHtml(g.group) + '班</td>';
+    DOMAIN_DEFS.forEach(function (d) {
+      var v = g.scores[d.name];
+      cells += '<td>' + (v === null ? '-' : v + '%') + '</td>';
+    });
+    tr.innerHTML = cells;
+    body.appendChild(tr);
+  });
+
+  var trCombined = document.createElement('tr');
+  trCombined.style.fontWeight = 'bold';
+  var combinedCells = '<td class="group-col">合計(確定済み)</td>';
+  DOMAIN_DEFS.forEach(function (d) {
+    var v = combinedScores[d.name];
+    combinedCells += '<td>' + (v === null ? '-' : v + '%') + '</td>';
+  });
+  trCombined.innerHTML = combinedCells;
+  body.appendChild(trCombined);
+}
+
+function colorForIndex(idx, alpha) {
+  var palette = [
+    [231, 122, 31], [76, 149, 108], [155, 89, 182], [52, 152, 219]
+  ];
+  var c = palette[idx % palette.length];
+  return 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + alpha + ')';
+}
+
+function escapeHtml(v) {
+  if (v === undefined || v === null) return '';
+  return String(v).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+
+document.getElementById('reloadBtn').addEventListener('click', loadDashboard);
+
+document.getElementById('pdfBtn').addEventListener('click', function () {
+  var btn = this;
+  btn.disabled = true;
+  btn.textContent = 'PDF作成中...';
+  var target = document.getElementById('pdfArea');
+  html2canvas(target, { scale: 2 }).then(function (canvas) {
+    var imgData = canvas.toDataURL('image/png');
+    var jsPDFLib = window.jspdf.jsPDF;
+    var pdfWidth = 210; // A4 mm
+    var pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+    var pdf = new jsPDFLib({ orientation: 'p', unit: 'mm', format: [pdfWidth, pdfHeight] });
+    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+    var dateStr = new Date().toISOString().slice(0, 10);
+    pdf.save('AGREEⅡ評価結果_' + dateStr + '.pdf');
+  }).catch(function (err) {
+    alert('PDFの作成に失敗しました: ' + err);
+    console.error(err);
+  }).finally(function () {
+    btn.disabled = false;
+    btn.textContent = 'PDFで保存';
+  });
+});
+
+loadDashboard();
+</script>
+
+</body>
+</html>

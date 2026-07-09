@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AGREE II 診療ガイドライン評価フォーム</title>
+<style>
+  :root {
+    --main-color: #2c5f8a;
+    --accent-color: #e07a1f;
+    --bg-color: #f5f7fa;
+    --border-color: #d8dee5;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
+    background: var(--bg-color);
+    margin: 0;
+    padding: 0;
+    color: #222;
+    line-height: 1.6;
+  }
+  header {
+    background: var(--main-color);
+    color: white;
+    padding: 16px 20px;
+  }
+  header h1 { margin: 0; font-size: 1.3em; }
+  header p { margin: 4px 0 0; font-size: 0.9em; opacity: 0.9; }
+
+  .container { max-width: 760px; margin: 0 auto; padding: 16px; }
+
+  .panel {
+    background: white;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+
+  .setup-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  .setup-row label { font-weight: bold; margin-right: 4px; }
+  select {
+    font-size: 1em;
+    padding: 8px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: white;
+  }
+
+  #statusLine {
+    margin-top: 10px;
+    font-size: 0.9em;
+    padding: 8px 10px;
+    border-radius: 6px;
+    background: #eef4fa;
+    color: var(--main-color);
+  }
+  #statusLine.warn { background: #fff3e0; color: #a05a00; }
+
+  .domain-title {
+    background: var(--main-color);
+    color: white;
+    padding: 8px 12px;
+    border-radius: 6px;
+    margin: 24px 0 12px;
+    font-size: 1.05em;
+  }
+
+  .item-block {
+    border-bottom: 1px solid var(--border-color);
+    padding: 14px 0;
+  }
+  .item-block:last-child { border-bottom: none; }
+  .item-number {
+    display: inline-block;
+    background: var(--accent-color);
+    color: white;
+    border-radius: 50%;
+    width: 26px;
+    height: 26px;
+    text-align: center;
+    line-height: 26px;
+    font-size: 0.85em;
+    margin-right: 8px;
+    flex-shrink: 0;
+  }
+  .item-text { font-weight: bold; }
+
+  .scale-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin: 10px 0 6px;
+    overflow-x: auto;
+  }
+  .scale-label-left, .scale-label-right {
+    font-size: 0.78em;
+    color: #666;
+    width: 90px;
+    flex-shrink: 0;
+  }
+  .scale-label-right { text-align: right; }
+  .scale-options {
+    display: flex;
+    gap: 6px;
+    flex: 1;
+    justify-content: center;
+  }
+  .scale-options label {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    font-size: 0.8em;
+    cursor: pointer;
+    color: #444;
+  }
+  .scale-options input[type="radio"] {
+    width: 20px;
+    height: 20px;
+    margin: 0 0 2px;
+  }
+
+  textarea {
+    width: 100%;
+    min-height: 44px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 8px;
+    font-family: inherit;
+    font-size: 0.92em;
+    resize: vertical;
+  }
+  .comment-label { font-size: 0.8em; color: #666; margin-bottom: 4px; display: block; }
+
+  .recommend-options { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 8px; }
+  .recommend-options label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+
+  .actions {
+    position: sticky;
+    bottom: 0;
+    background: white;
+    border-top: 1px solid var(--border-color);
+    padding: 12px 16px;
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    box-shadow: 0 -2px 6px rgba(0,0,0,0.05);
+  }
+  button {
+    font-size: 1em;
+    padding: 10px 20px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+  }
+  #saveBtn { background: white; border: 1.5px solid var(--main-color); color: var(--main-color); }
+  #submitBtn { background: var(--accent-color); color: white; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  #formArea { display: none; }
+  .hint { font-size: 0.85em; color: #666; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>AGREE II 診療ガイドライン評価フォーム</h1>
+  <p id="guidelineLine">ガイドライン名を読み込み中...</p>
+</header>
+
+<div class="container">
+
+  <div class="panel">
+    <div class="setup-row">
+      <label for="groupSelect">班を選択:</label>
+      <select id="groupSelect">
+        <option value="">-- 班を選んでください --</option>
+      </select>
+    </div>
+    <div id="statusLine">班を選ぶと、前回の続きがあれば自動的に読み込まれます。</div>
+  </div>
+
+  <div id="formArea">
+    <div id="domainsContainer"></div>
+
+    <div class="panel">
+      <div class="domain-title" style="margin-top:0;">ガイドラインの全体評価</div>
+      <div class="item-block">
+        <div class="item-text">1. このガイドラインの全体的な質を評価してください。</div>
+        <div class="scale-row">
+          <span class="scale-label-left">最も低い質</span>
+          <div class="scale-options" id="overallQualityScale"></div>
+          <span class="scale-label-right">最も高い質</span>
+        </div>
+      </div>
+      <div class="item-block">
+        <div class="item-text">2. このガイドラインの使用を推奨する。</div>
+        <div class="recommend-options">
+          <label><input type="radio" name="overallRecommend" value="推奨する"> 推奨する</label>
+          <label><input type="radio" name="overallRecommend" value="条件付きで推奨する"> 条件付きで推奨する(要修正)</label>
+          <label><input type="radio" name="overallRecommend" value="推奨しない"> 推奨しない</label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="actions" id="actionBar" style="display:none;">
+  <button id="saveBtn">一時保存</button>
+  <button id="submitBtn">提出(確定)</button>
+</div>
+
+<script>
+// ==== 設定: デプロイ後、あなたのGAS Web AプリのURLに書き換えてください ====
+var API_URL = "YOUR_WEB_APP_URL_HERE";
+
+// ==== AGREE II 項目データ (Minds AGREEⅡ日本語訳 2022年9月改訂 準拠) ====
+var DOMAINS = [
+  {
+    name: "領域1：対象と目的",
+    items: [
+      { n: 1, text: "ガイドライン全体の目的が具体的に記載されている。" },
+      { n: 2, text: "ガイドラインが取り扱う健康上の問題が具体的に記載されている。" },
+      { n: 3, text: "ガイドラインの適用が想定される対象集団(患者、一般市民など)が具体的に記載されている。" }
+    ]
+  },
+  {
+    name: "領域2：利害関係者の参加",
+    items: [
+      { n: 4, text: "ガイドライン作成グループには、関係する全ての専門家グループの代表者が加わっている。" },
+      { n: 5, text: "対象集団(患者、一般市民など)の価値観や希望が調べられた。" },
+      { n: 6, text: "対象となるガイドラインの利用者が明確に定義されている。" }
+    ]
+  },
+  {
+    name: "領域3：作成の厳密さ",
+    items: [
+      { n: 7, text: "エビデンスを検索するために系統的な方法が用いられている。" },
+      { n: 8, text: "エビデンスの選択基準が明確に記載されている。" },
+      { n: 9, text: "エビデンス総体(body of evidence)の強さと限界が明確に記載されている。" },
+      { n: 10, text: "推奨を作成する方法が明確に記載されている。" },
+      { n: 11, text: "推奨の作成にあたって、健康上の益、副作用、リスクが考慮されている。" },
+      { n: 12, text: "推奨とそれを支持するエビデンスとの対応関係が明確である。" },
+      { n: 13, text: "ガイドラインの公表に先立って、専門家による外部評価がなされている。" },
+      { n: 14, text: "ガイドラインの改訂手続きが示されている。" }
+    ]
+  },
+  {
+    name: "領域4：提示の明確さ",
+    items: [
+      { n: 15, text: "推奨が具体的であり、曖昧でない。" },
+      { n: 16, text: "患者の状態や健康上の問題に応じて、異なる選択肢が明確に示されている。" },
+      { n: 17, text: "重要な推奨が容易に見つけられる。" }
+    ]
+  },
+  {
+    name: "領域5：適用可能性",
+    items: [
+      { n: 18, text: "ガイドラインの適用にあたっての促進要因と阻害要因が記載されている。" },
+      { n: 19, text: "どのように推奨を適用するかについての助言・ツールを提供している。" },
+      { n: 20, text: "推奨の適用に対する潜在的な資源の影響が考慮されている。" },
+      { n: 21, text: "ガイドラインにモニタリングや監査のための基準が示されている。" }
+    ]
+  },
+  {
+    name: "領域6：編集の独立性",
+    items: [
+      { n: 22, text: "資金提供者の見解が、ガイドラインの内容に影響していない。" },
+      { n: 23, text: "ガイドライン作成グループメンバーの利益相反が記録され、適切な対応がなされている。" }
+    ]
+  }
+];
+
+var currentGroup = null;
+var isDirty = false;
+
+function buildScaleOptions(container, name) {
+  for (var i = 1; i <= 7; i++) {
+    var label = document.createElement('label');
+    var input = document.createElement('input');
+    input.type = 'radio';
+    input.name = name;
+    input.value = i;
+    input.addEventListener('change', markDirty);
+    label.appendChild(input);
+    label.appendChild(document.createTextNode(i));
+    container.appendChild(label);
+  }
+}
+
+function renderForm() {
+  var container = document.getElementById('domainsContainer');
+  container.innerHTML = '';
+  DOMAINS.forEach(function (domain) {
+    var panel = document.createElement('div');
+    panel.className = 'panel';
+
+    var title = document.createElement('div');
+    title.className = 'domain-title';
+    title.style.marginTop = '0';
+    title.textContent = domain.name;
+    panel.appendChild(title);
+
+    domain.items.forEach(function (item) {
+      var block = document.createElement('div');
+      block.className = 'item-block';
+
+      var textDiv = document.createElement('div');
+      var numSpan = document.createElement('span');
+      numSpan.className = 'item-number';
+      numSpan.textContent = item.n;
+      var textSpan = document.createElement('span');
+      textSpan.className = 'item-text';
+      textSpan.textContent = item.text;
+      textDiv.appendChild(numSpan);
+      textDiv.appendChild(textSpan);
+      block.appendChild(textDiv);
+
+      var scaleRow = document.createElement('div');
+      scaleRow.className = 'scale-row';
+      var left = document.createElement('span');
+      left.className = 'scale-label-left';
+      left.textContent = '全くあてはまらない';
+      var right = document.createElement('span');
+      right.className = 'scale-label-right';
+      right.textContent = '強くあてはまる';
+      var options = document.createElement('div');
+      options.className = 'scale-options';
+      buildScaleOptions(options, 'item' + item.n + '_score');
+      scaleRow.appendChild(left);
+      scaleRow.appendChild(options);
+      scaleRow.appendChild(right);
+      block.appendChild(scaleRow);
+
+      var commentLabel = document.createElement('span');
+      commentLabel.className = 'comment-label';
+      commentLabel.textContent = 'コメント(任意)';
+      var textarea = document.createElement('textarea');
+      textarea.id = 'item' + item.n + '_comment';
+      textarea.addEventListener('input', markDirty);
+      block.appendChild(commentLabel);
+      block.appendChild(textarea);
+
+      panel.appendChild(block);
+    });
+
+    container.appendChild(panel);
+  });
+
+  var overallQualityContainer = document.getElementById('overallQualityScale');
+  overallQualityContainer.innerHTML = '';
+  buildScaleOptions(overallQualityContainer, 'overallQuality');
+
+  document.querySelectorAll('input[name="overallRecommend"]').forEach(function (el) {
+    el.addEventListener('change', markDirty);
+  });
+}
+
+function markDirty() {
+  isDirty = true;
+}
+
+function setStatus(text, warn) {
+  var el = document.getElementById('statusLine');
+  el.textContent = text;
+  el.className = warn ? 'warn' : '';
+}
+
+function collectAnswers() {
+  var answers = {};
+  for (var i = 1; i <= 23; i++) {
+    var scoreEl = document.querySelector('input[name="item' + i + '_score"]:checked');
+    var commentEl = document.getElementById('item' + i + '_comment');
+    answers['item' + i] = {
+      score: scoreEl ? Number(scoreEl.value) : '',
+      comment: commentEl ? commentEl.value : ''
+    };
+  }
+  var overallQualityEl = document.querySelector('input[name="overallQuality"]:checked');
+  var overallRecommendEl = document.querySelector('input[name="overallRecommend"]:checked');
+  answers.overallQuality = overallQualityEl ? Number(overallQualityEl.value) : '';
+  answers.overallRecommend = overallRecommendEl ? overallRecommendEl.value : '';
+  return answers;
+}
+
+function fillAnswers(row) {
+  for (var i = 1; i <= 23; i++) {
+    var score = row['項目' + i + '_評点'];
+    var comment = row['項目' + i + '_コメント'];
+    if (score !== '' && score !== undefined && score !== null) {
+      var radio = document.querySelector('input[name="item' + i + '_score"][value="' + score + '"]');
+      if (radio) radio.checked = true;
+    }
+    var commentEl = document.getElementById('item' + i + '_comment');
+    if (commentEl && comment) commentEl.value = comment;
+  }
+  var oq = row['全体評価_質'];
+  if (oq !== '' && oq !== undefined && oq !== null) {
+    var oqRadio = document.querySelector('input[name="overallQuality"][value="' + oq + '"]');
+    if (oqRadio) oqRadio.checked = true;
+  }
+  var orRec = row['全体評価_推奨'];
+  if (orRec) {
+    var orRadio = document.querySelector('input[name="overallRecommend"][value="' + orRec + '"]');
+    if (orRadio) orRadio.checked = true;
+  }
+}
+
+function loadConfig() {
+  fetch(API_URL + '?action=config')
+    .then(function (res) { return res.json(); })
+    .then(function (data) {
+      if (!data.ok) throw new Error(data.error || 'config load failed');
+      document.getElementById('guidelineLine').textContent =
+        '評価対象ガイドライン: ' + (data.config.guidelineName || '(未設定)');
+      var select = document.getElementById('groupSelect');
+      for (var i = 1; i <= data.config.groupCount; i++) {
+        var opt = document.createElement('option');
+        opt.value = i;
+        opt.textContent = i + '班';
+        select.appendChild(opt);
+      }
+    })
+    .catch(function (err) {
+      document.getElementById('guidelineLine').textContent = '設定の読み込みに失敗しました。しばらくしてから再読み込みしてください。';
+      console.error(err);
+    });
+}
+
+function onGroupChange() {
+  var select = document.getElementById('groupSelect');
+  var group = select.value;
+  if (!group) {
+    document.getElementById('formArea').style.display = 'none';
+    document.getElementById('actionBar').style.display = 'none';
+    currentGroup = null;
+    return;
+  }
+  currentGroup = group;
+  renderForm();
+  document.getElementById('formArea').style.display = 'block';
+  document.getElementById('actionBar').style.display = 'flex';
+  setStatus(group + '班の前回の続きを確認しています...');
+
+  fetch(API_URL + '?action=load&group=' + encodeURIComponent(group))
+    .then(function (res) { return res.json(); })
+    .then(function (data) {
+      if (!data.ok) throw new Error(data.error || 'load failed');
+      if (data.data && data.data.exists) {
+        fillAnswers(data.data.row);
+        if (data.data.row['ステータス'] === '確定') {
+          setStatus(group + '班は既に「提出(確定)」済みです。修正して再提出することもできます。');
+        } else {
+          setStatus(group + '班の前回の続きを読み込みました。続きから回答してください。');
+        }
+      } else {
+        setStatus(group + '班の新しい回答を開始します。');
+      }
+      isDirty = false;
+    })
+    .catch(function (err) {
+      setStatus('前回データの読み込みに失敗しました。ネット接続を確認してください。', true);
+      console.error(err);
+    });
+}
+
+function sendData(action, useBeacon) {
+  if (!currentGroup) return;
+  var payload = JSON.stringify({
+    action: action,
+    group: currentGroup,
+    answers: collectAnswers()
+  });
+
+  if (useBeacon && navigator.sendBeacon) {
+    var blob = new Blob([payload], { type: 'text/plain;charset=utf-8' });
+    navigator.sendBeacon(API_URL, blob);
+    return Promise.resolve();
+  }
+
+  return fetch(API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: payload
+  }).then(function (res) { return res.json(); });
+}
+
+document.getElementById('groupSelect').addEventListener('change', onGroupChange);
+
+document.getElementById('saveBtn').addEventListener('click', function () {
+  if (!currentGroup) return;
+  var btn = this;
+  btn.disabled = true;
+  setStatus('一時保存しています...');
+  sendData('save', false)
+    .then(function () {
+      isDirty = false;
+      setStatus('一時保存しました。続きはいつでもこの画面から「' + currentGroup + '班」を選べば再開できます。');
+    })
+    .catch(function (err) {
+      setStatus('保存に失敗しました。ネット接続を確認してもう一度お試しください。', true);
+      console.error(err);
+    })
+    .finally(function () { btn.disabled = false; });
+});
+
+document.getElementById('submitBtn').addEventListener('click', function () {
+  if (!currentGroup) return;
+  if (!confirm(currentGroup + '班の回答を提出(確定)します。よろしいですか？')) return;
+  var btn = this;
+  btn.disabled = true;
+  setStatus('提出しています...');
+  sendData('submit', false)
+    .then(function () {
+      isDirty = false;
+      setStatus(currentGroup + '班の回答を提出しました。ご協力ありがとうございました。');
+    })
+    .catch(function (err) {
+      setStatus('提出に失敗しました。ネット接続を確認してもう一度お試しください。', true);
+      console.error(err);
+    })
+    .finally(function () { btn.disabled = false; });
+});
+
+// 離脱時の自動保存(セーフティネット)
+window.addEventListener('pagehide', function () {
+  if (isDirty && currentGroup) {
+    sendData('save', true);
+  }
+});
+document.addEventListener('visibilitychange', function () {
+  if (document.visibilityState === 'hidden' && isDirty && currentGroup) {
+    sendData('save', true);
+  }
+});
+
+loadConfig();
+</script>
+
+</body>
+</html>

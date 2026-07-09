@@ -173,7 +173,7 @@
 
 <script>
 // ==== 設定: デプロイ後、あなたのGAS Web AプリのURLに書き換えてください ====
-var API_URL = "https://script.google.com/macros/s/AKfycbyaKp-ytpBpi_LH2-t7tfJDAvouv8wEyMVfTp1rI8wxCcttJzr_tJWSBjcXfilCnx2vfg/exec";
+var API_URL = "YOUR_WEB_APP_URL_HERE";
 
 var DOMAIN_DEFS = [
   { name: "領域1 対象と目的", items: [1, 2, 3] },
@@ -312,24 +312,31 @@ function computeDomainScores(responsesSubset) {
   return result;
 }
 
+// 班ごとに見分けやすいよう、色に加えて点の形も変える(最大4班分)
+var POINT_STYLES = ['circle', 'rectRot', 'triangle', 'rectRounded'];
+
 function renderDomainChart(domainScoresByGroup, combinedScores) {
   var ctx = document.getElementById('domainChart').getContext('2d');
   var labels = DOMAIN_DEFS.map(function (d) { return d.name; });
 
+  // 各班は「点のみ」で表示する(線でつないだ図形にすると4つ重なって見づらいため)
   var datasets = domainScoresByGroup.map(function (g, idx) {
     var color = colorForIndex(idx, 1);
     return {
       label: g.group + '班' + (g.status === '確定' ? '' : '(下書き)'),
       data: labels.map(function (l) { return g.scores[l]; }),
-      backgroundColor: colorForIndex(idx, 0.12),
-      borderColor: color,
-      borderWidth: g.status === '確定' ? 2 : 1,
-      borderDash: g.status === '確定' ? [] : [4, 3],
+      showLine: false,
+      fill: false,
+      pointStyle: POINT_STYLES[idx % POINT_STYLES.length],
       pointBackgroundColor: color,
-      pointRadius: 3
+      pointBorderColor: '#fff',
+      pointBorderWidth: 1.5,
+      pointRadius: g.status === '確定' ? 7 : 5,
+      pointHoverRadius: 9
     };
   });
 
+  // 合計(確定済み班)だけを、塗りつぶした図形として表示する
   datasets.push({
     label: '合計(確定済み班)',
     data: labels.map(function (l) { return combinedScores[l]; }),
@@ -337,7 +344,8 @@ function renderDomainChart(domainScoresByGroup, combinedScores) {
     borderColor: '#2c5f8a',
     borderWidth: 3,
     pointBackgroundColor: '#2c5f8a',
-    pointRadius: 4
+    pointRadius: 4,
+    order: 1
   });
 
   if (chartInstance) chartInstance.destroy();
@@ -346,7 +354,7 @@ function renderDomainChart(domainScoresByGroup, combinedScores) {
     data: { labels: labels, datasets: datasets },
     options: {
       responsive: true,
-      plugins: { legend: { position: 'bottom' } },
+      plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, boxHeight: 8 } } },
       scales: {
         r: {
           angleLines: { color: 'rgba(216,222,229,0.8)' },

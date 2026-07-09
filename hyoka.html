@@ -171,6 +171,7 @@
   button:disabled { opacity: 0.5; cursor: not-allowed; }
 
   #formArea { display: none; }
+  #formArea.locked { opacity: 0.6; pointer-events: none; }
   .hint { font-size: 0.85em; color: #666; }
 </style>
 </head>
@@ -233,7 +234,7 @@
 
 <script>
 // ==== 設定: デプロイ後、あなたのGAS Web AプリのURLに書き換えてください ====
-var API_URL = "https://script.google.com/macros/s/AKfycbyaKp-ytpBpi_LH2-t7tfJDAvouv8wEyMVfTp1rI8wxCcttJzr_tJWSBjcXfilCnx2vfg/exec";
+var API_URL = "YOUR_WEB_APP_URL_HERE";
 
 // ==== AGREE II 項目データ (Minds AGREEⅡ日本語訳 2022年9月改訂 準拠) ====
 var DOMAINS = [
@@ -404,6 +405,13 @@ function markDirty() {
   isDirty = true;
 }
 
+// 確定済みの回答は、「確定を取り消す」を押すまで編集できないようにする。
+function setFormLocked(locked) {
+  document.getElementById('formArea').classList.toggle('locked', locked);
+  document.getElementById('saveBtn').disabled = locked;
+  document.getElementById('submitBtn').disabled = locked;
+}
+
 function setStatus(text, warn) {
   var el = document.getElementById('statusLine');
   el.textContent = text;
@@ -491,6 +499,7 @@ function onGroupChange() {
   document.getElementById('formArea').style.display = 'block';
   document.getElementById('actionBar').style.display = 'flex';
   document.getElementById('revertBtn').style.display = 'none';
+  setFormLocked(false);
   setStatus(group + '班の前回の続きを確認しています...');
 
   fetch(API_URL + '?action=load&group=' + encodeURIComponent(group))
@@ -501,8 +510,9 @@ function onGroupChange() {
         fillAnswers(data.data.row);
         currentStatus = data.data.row['ステータス'];
         if (currentStatus === '確定') {
-          setStatus(group + '班は既に「提出(確定)」済みです。修正して再提出することも、確定を取り消して下書きに戻すこともできます。');
+          setStatus(group + '班は既に「提出(確定)」済みです。修正するには、まず「確定を取り消す」を押して下書きに戻してください。');
           document.getElementById('revertBtn').style.display = 'inline-block';
+          setFormLocked(true);
         } else {
           setStatus(group + '班の前回の続きを読み込みました。続きから回答してください。');
         }
@@ -573,7 +583,7 @@ document.getElementById('saveBtn').addEventListener('click', function () {
       setStatus(err && err.message ? err.message : '保存に失敗しました。ネット接続を確認してもう一度お試しください。', true);
       console.error(err);
     })
-    .finally(function () { btn.disabled = false; });
+    .finally(function () { btn.disabled = (currentStatus === '確定'); });
 });
 
 document.getElementById('submitBtn').addEventListener('click', function () {
@@ -587,13 +597,14 @@ document.getElementById('submitBtn').addEventListener('click', function () {
       isDirty = false;
       currentStatus = '確定';
       document.getElementById('revertBtn').style.display = 'inline-block';
-      setStatus(currentGroup + '班の回答を提出しました。ご協力ありがとうございました。');
+      setStatus(currentGroup + '班の回答を提出しました。ご協力ありがとうございました。修正するには「確定を取り消す」を押してください。');
+      setFormLocked(true);
     })
     .catch(function (err) {
       setStatus(err && err.message ? err.message : '提出に失敗しました。ネット接続を確認してもう一度お試しください。', true);
       console.error(err);
     })
-    .finally(function () { btn.disabled = false; });
+    .finally(function () { btn.disabled = (currentStatus === '確定'); });
 });
 
 document.getElementById('revertBtn').addEventListener('click', function () {
@@ -612,6 +623,7 @@ document.getElementById('revertBtn').addEventListener('click', function () {
       if (!data.ok) throw new Error(data.error || 'revert failed');
       currentStatus = '下書き';
       btn.style.display = 'none';
+      setFormLocked(false);
       setStatus(currentGroup + '班の確定を取り消し、下書きの状態に戻しました。修正して、必要なときにまた提出してください。');
     })
     .catch(function (err) {

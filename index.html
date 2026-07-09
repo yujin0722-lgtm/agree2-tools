@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AGREE II 診療ガイドライン評価ツール</title>
+<style>
+  :root {
+    --main-color: #2c5f8a;
+    --accent-color: #e07a1f;
+    --bg-color: #f5f7fa;
+    --border-color: #d8dee5;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", sans-serif;
+    background: var(--bg-color);
+    margin: 0;
+    padding: 0;
+    color: #222;
+    line-height: 1.6;
+  }
+  header {
+    background: var(--main-color);
+    color: white;
+    padding: 20px;
+  }
+  header h1 { margin: 0; font-size: 1.3em; }
+  header p { margin: 6px 0 0; font-size: 0.88em; opacity: 0.9; }
+
+  .container { max-width: 640px; margin: 0 auto; padding: 20px; }
+
+  .card {
+    display: block;
+    background: white;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 14px;
+    text-decoration: none;
+    color: inherit;
+    transition: box-shadow 0.15s;
+  }
+  .card:hover { box-shadow: 0 2px 10px rgba(0,0,0,0.08); }
+  .card h2 {
+    margin: 0 0 6px;
+    font-size: 1.1em;
+    color: var(--main-color);
+  }
+  .card p { margin: 0; font-size: 0.9em; color: #555; }
+  .card .arrow { float: right; color: var(--accent-color); font-size: 1.3em; }
+
+  .section-title {
+    margin: 32px 0 12px;
+    font-size: 1.05em;
+    color: var(--main-color);
+    border-bottom: 2px solid var(--border-color);
+    padding-bottom: 6px;
+  }
+
+  .panel {
+    background: white;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 18px 20px;
+    margin-bottom: 16px;
+  }
+  .panel h3 {
+    margin: 0 0 10px;
+    font-size: 1em;
+    color: var(--accent-color);
+  }
+  .panel ol, .panel ul { margin: 0; padding-left: 1.3em; font-size: 0.9em; }
+  .panel li { margin-bottom: 6px; }
+  .panel li:last-child { margin-bottom: 0; }
+
+  .note {
+    font-size: 0.85em;
+    color: #777;
+    margin-top: 24px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border-color);
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>AGREE II 診療ガイドライン評価ツール</h1>
+  <p>グループワーク形式の勉強会で使う評価・集計用ページです。</p>
+</header>
+
+<div class="container">
+
+  <a class="card" href="hyoka.html">
+    <span class="arrow">→</span>
+    <h2>評価フォームに回答する</h2>
+    <p>班ごとにAGREE IIの評価を入力・保存・提出します。参加者はこちらを開いてください。</p>
+  </a>
+
+  <a class="card" href="dashboard.html">
+    <span class="arrow">→</span>
+    <h2>ダッシュボードを見る</h2>
+    <p>各班の評価結果をレーダーチャートやコメント一覧で確認できます。PDF保存も可能です。</p>
+  </a>
+
+  <div class="section-title">使い方</div>
+
+  <div class="panel">
+    <h3>参加者の方へ(評価フォーム)</h3>
+    <ol>
+      <li>「評価フォームに回答する」を開き、自分の班を選択します。</li>
+      <li>前回の続きがあれば、入力内容が自動で読み込まれます。</li>
+      <li>23項目の評点(1〜7)とコメント(任意)、および全体評価(質・使用の推奨)に回答します。</li>
+      <li>ボタンを間違って押した場合は、各項目の「クリア」で選択を取り消せます。</li>
+      <li>勉強会の途中で終わる場合は「一時保存」を押してください。次回同じ班を選ぶと続きから再開できます。</li>
+      <li>班としての回答がまとまったら「提出(確定)」を押します。確定後は内容が編集できなくなります。修正が必要な場合は「確定を取り消す」を押してから編集してください。</li>
+    </ol>
+  </div>
+
+  <div class="panel">
+    <h3>主催者の方へ(ダッシュボード)</h3>
+    <ol>
+      <li>「ダッシュボードを見る」で、各班の回答状況(下書き/確定)と、未回答の項目があるかを一覧で確認できます。</li>
+      <li>領域ごとの得点はレーダーチャートで表示されます。各班の得点は点で、全体の集計結果は塗りつぶした図形で示されます。</li>
+      <li>項目ごとに、各班が記入したコメントを確認できます。</li>
+      <li>「PDFとして保存」ボタンで、ダッシュボードの内容をそのままPDFに出力できます。</li>
+    </ol>
+  </div>
+
+  <p class="note">
+    勉強会の設定(ガイドライン名・班数の変更)や、新しい勉強会を始める際のリフレッシュ操作は、別途お渡ししている管理画面(kanri.html)から行ってください。参加者に共有するページではないため、このページにはリンクを置いていません。
+  </p>
+
+</div>
+
+</body>
+</html>

@@ -72,6 +72,8 @@
   }
   .status-confirmed { background: #e2f5e9; color: #1f7a3d; }
   .status-draft { background: #fff3e0; color: #a05a00; }
+  .status-missing { background: #fdeaea; color: #c0392b; }
+  .status-ok { color: #999; }
 
   canvas { max-width: 100%; }
 
@@ -140,7 +142,7 @@
       <h2>班ごとの全体評価</h2>
       <table id="overallTable">
         <thead>
-          <tr><th class="group-col">班</th><th>ステータス</th><th>全体的な質(1〜7)</th><th>使用の推奨</th></tr>
+          <tr><th class="group-col">班</th><th>ステータス</th><th>全体的な質(1〜7)</th><th>使用の推奨</th><th>未回答の項目</th></tr>
         </thead>
         <tbody></tbody>
       </table>
@@ -173,7 +175,7 @@
 
 <script>
 // ==== 設定: デプロイ後、あなたのGAS Web AプリのURLに書き換えてください ====
-var API_URL = "https://script.google.com/macros/s/AKfycbyaKp-ytpBpi_LH2-t7tfJDAvouv8wEyMVfTp1rI8wxCcttJzr_tJWSBjcXfilCnx2vfg/exec";
+var API_URL = "YOUR_WEB_APP_URL_HERE";
 
 var DOMAIN_DEFS = [
   { name: "領域1 対象と目的", items: [1, 2, 3] },
@@ -250,21 +252,38 @@ function render(config, responses) {
   renderComments(responses);
 }
 
+/**
+ * 指定した回答行のうち、評点(スコア)が未入力の項目番号(1〜23)の配列を返す。
+ */
+function getMissingItemNumbers(r) {
+  var missing = [];
+  for (var i = 1; i <= 23; i++) {
+    var v = r['項目' + i + '_評点'];
+    if (v === '' || v === undefined || v === null) missing.push(i);
+  }
+  return missing;
+}
+
 function renderOverallTable(responses) {
   var tbody = document.querySelector('#overallTable tbody');
   tbody.innerHTML = '';
   if (responses.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="4">まだ回答がありません。</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5">まだ回答がありません。</td></tr>';
     return;
   }
   responses.forEach(function (r) {
     var tr = document.createElement('tr');
     var statusClass = r['ステータス'] === '確定' ? 'status-confirmed' : 'status-draft';
+    var missing = getMissingItemNumbers(r);
+    var missingCell = missing.length === 0
+      ? '<span class="status-ok">なし</span>'
+      : '<span class="status-badge status-missing" title="項目 ' + missing.join(', ') + '">未回答 ' + missing.length + '件</span>';
     tr.innerHTML =
       '<td class="group-col">' + escapeHtml(r['班']) + '班</td>' +
       '<td><span class="status-badge ' + statusClass + '">' + escapeHtml(r['ステータス'] || '未回答') + '</span></td>' +
       '<td>' + escapeHtml(r['全体評価_質']) + '</td>' +
-      '<td>' + escapeHtml(r['全体評価_推奨']) + '</td>';
+      '<td>' + escapeHtml(r['全体評価_推奨']) + '</td>' +
+      '<td>' + missingCell + '</td>';
     tbody.appendChild(tr);
   });
 }
@@ -470,16 +489,24 @@ function renderComments(responses) {
         .filter(function (v) { return v !== '' && v !== undefined && v !== null; })
         .map(Number);
       var avg = scores.length ? (scores.reduce(function (a, b) { return a + b; }, 0) / scores.length).toFixed(1) : '-';
+      var missingGroups = responses.filter(function (r) {
+        var v = r['項目' + itemN + '_評点'];
+        return v === '' || v === undefined || v === null;
+      });
 
       var item = document.createElement('div');
       item.className = 'accordion-item';
+
+      var missingHtml = missingGroups.length > 0
+        ? ' ・ <span class="status-badge status-missing">未回答: ' + missingGroups.map(function (r) { return escapeHtml(r['班']) + '班'; }).join(', ') + '</span>'
+        : '';
 
       var header = document.createElement('button');
       header.className = 'accordion-header';
       header.type = 'button';
       header.innerHTML =
         '<span><span class="num">項目' + itemN + '</span>' + escapeHtml(ITEM_TEXTS[itemN]) + '</span>' +
-        '<span class="meta">平均評点 ' + avg + '/7 ・ コメント ' + rowsWithComment.length + '件 <span class="accordion-arrow">▾</span></span>';
+        '<span class="meta">平均評点 ' + avg + '/7 ・ コメント ' + rowsWithComment.length + '件' + missingHtml + ' <span class="accordion-arrow">▾</span></span>';
       header.addEventListener('click', function () {
         item.classList.toggle('open');
       });

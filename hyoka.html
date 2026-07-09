@@ -217,7 +217,7 @@
 
 <script>
 // ==== 設定: デプロイ後、あなたのGAS Web AプリのURLに書き換えてください ====
-var API_URL = "https://script.google.com/macros/s/AKfycbyaKp-ytpBpi_LH2-t7tfJDAvouv8wEyMVfTp1rI8wxCcttJzr_tJWSBjcXfilCnx2vfg/exec";
+var API_URL = "YOUR_WEB_APP_URL_HERE";
 
 // ==== AGREE II 項目データ (Minds AGREEⅡ日本語訳 2022年9月改訂 準拠) ====
 var DOMAINS = [
@@ -498,7 +498,14 @@ function sendData(action, useBeacon) {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
     body: payload
-  }).then(function (res) { return res.json(); });
+  })
+    .then(function (res) { return res.json(); })
+    .then(function (data) {
+      // サーバー側が ok:false を返した場合(例: 班数の設定が変わり、この班が範囲外になった場合)は
+      // ここで失敗として扱う。そうしないと、失敗していても「保存しました」と表示されてしまう。
+      if (!data.ok) throw new Error(data.error || '処理に失敗しました');
+      return data;
+    });
 }
 
 document.getElementById('groupSelect').addEventListener('change', onGroupChange);
@@ -516,7 +523,7 @@ document.getElementById('saveBtn').addEventListener('click', function () {
       setStatus('一時保存しました。続きはいつでもこの画面から「' + currentGroup + '班」を選べば再開できます。');
     })
     .catch(function (err) {
-      setStatus('保存に失敗しました。ネット接続を確認してもう一度お試しください。', true);
+      setStatus(err && err.message ? err.message : '保存に失敗しました。ネット接続を確認してもう一度お試しください。', true);
       console.error(err);
     })
     .finally(function () { btn.disabled = false; });
@@ -536,7 +543,7 @@ document.getElementById('submitBtn').addEventListener('click', function () {
       setStatus(currentGroup + '班の回答を提出しました。ご協力ありがとうございました。');
     })
     .catch(function (err) {
-      setStatus('提出に失敗しました。ネット接続を確認してもう一度お試しください。', true);
+      setStatus(err && err.message ? err.message : '提出に失敗しました。ネット接続を確認してもう一度お試しください。', true);
       console.error(err);
     })
     .finally(function () { btn.disabled = false; });

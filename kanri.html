@@ -109,6 +109,11 @@
       <tbody></tbody>
     </table>
     <button id="reloadStatusBtn" style="margin-top:12px; background:white; border:1.5px solid var(--main-color); color:var(--main-color);">状況を再読み込み</button>
+
+    <div id="outOfRangeWarning" style="display:none; margin-top:14px; padding:12px; background:#fdeaea; border:1px solid var(--danger-color); border-radius:8px;">
+      <p style="margin:0 0 10px; font-size:0.88em; color:var(--danger-color);"></p>
+      <button id="cleanupBtn" style="background:var(--danger-color); color:white;">このデータを削除する</button>
+    </div>
   </div>
 
   <div class="panel danger">
@@ -122,7 +127,7 @@
 
 <script>
 // ==== 設定: デプロイ後、あなたのGAS Web AプリのURLに書き換えてください ====
-var API_URL = "https://script.google.com/macros/s/AKfycbyaKp-ytpBpi_LH2-t7tfJDAvouv8wEyMVfTp1rI8wxCcttJzr_tJWSBjcXfilCnx2vfg/exec";
+var API_URL = "YOUR_WEB_APP_URL_HERE";
 
 var latestResponses = [];
 var latestGroupCount = 4;
@@ -137,11 +142,35 @@ function loadCurrentState() {
       latestGroupCount = data.config.groupCount;
       latestResponses = data.responses;
       renderStatusTable(data.config.groupCount, data.responses);
+      renderOutOfRangeWarning(data.config.groupCount, data.responses);
     })
     .catch(function (err) {
       showMsg('configMsg', '現在の設定の読み込みに失敗しました。API URLの設定を確認してください。(' + err + ')', true);
       console.error(err);
     });
+}
+
+/**
+ * 現在の班数設定の範囲外(例: 班数を2に変更した後に残っている3班のデータなど)がないか確認し、
+ * あれば警告とクリーンアップボタンを表示する。
+ */
+function renderOutOfRangeWarning(groupCount, responses) {
+  var warningBox = document.getElementById('outOfRangeWarning');
+  var outOfRange = responses.filter(function (r) {
+    var g = Number(r['班']);
+    return !g || g < 1 || g > groupCount;
+  });
+
+  if (outOfRange.length === 0) {
+    warningBox.style.display = 'none';
+    return;
+  }
+
+  var labels = outOfRange.map(function (r) { return r['班'] + '班'; }).join('、');
+  warningBox.querySelector('p').textContent =
+    '現在の班数設定(1〜' + groupCount + '班)の範囲外に、' + labels + 'のデータが残っています。' +
+    '評価フォームを開いたままだった端末から誤って送信された可能性があります。不要であれば削除してください。';
+  warningBox.style.display = 'block';
 }
 
 function renderStatusTable(groupCount, responses) {
@@ -219,6 +248,28 @@ document.getElementById('saveConfigBtn').addEventListener('click', function () {
 });
 
 document.getElementById('reloadStatusBtn').addEventListener('click', loadCurrentState);
+
+document.getElementById('cleanupBtn').addEventListener('click', function () {
+  if (!confirm('現在の班数設定の範囲外にあるデータを削除します。この操作は取り消せません。よろしいですか？')) return;
+  var btn = this;
+  btn.disabled = true;
+  fetch(API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ action: 'cleanupOutOfRange' })
+  })
+    .then(function (res) { return res.json(); })
+    .then(function (data) {
+      if (!data.ok) throw new Error(data.error || 'cleanup failed');
+      showMsg('configMsg', '範囲外のデータを削除しました。', false);
+      loadCurrentState();
+    })
+    .catch(function (err) {
+      showMsg('configMsg', '削除に失敗しました。(' + err + ')', true);
+      console.error(err);
+    })
+    .finally(function () { btn.disabled = false; });
+});
 
 document.getElementById('refreshBtn').addEventListener('click', function () {
   var hasDraft = latestResponses.some(function (r) { return r['ステータス'] !== '確定'; });

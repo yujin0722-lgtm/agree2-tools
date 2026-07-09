@@ -74,6 +74,48 @@
   .status-draft { background: #fff3e0; color: #a05a00; }
 
   canvas { max-width: 100%; }
+
+  .accordion-item {
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    margin-bottom: 8px;
+    overflow: hidden;
+  }
+  .accordion-header {
+    width: 100%;
+    text-align: left;
+    background: #f8fafc;
+    border: none;
+    padding: 10px 14px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.9em;
+    font-family: inherit;
+  }
+  .accordion-header .num { color: var(--main-color); font-weight: bold; margin-right: 8px; }
+  .accordion-header .meta { font-size: 0.8em; color: #888; font-weight: normal; }
+  .accordion-arrow { transition: transform 0.15s; }
+  .accordion-item.open .accordion-arrow { transform: rotate(180deg); }
+  .accordion-body { display: none; padding: 12px 14px; border-top: 1px solid var(--border-color); }
+  .accordion-item.open .accordion-body { display: block; }
+
+  .comment-row { padding: 8px 0; border-bottom: 1px solid #eee; }
+  .comment-row:last-child { border-bottom: none; }
+  .comment-row .who { font-size: 0.82em; color: #555; margin-bottom: 3px; }
+  .comment-row .who .score-badge {
+    display: inline-block; background: var(--main-color); color: white;
+    border-radius: 10px; padding: 1px 8px; font-size: 0.85em; margin-right: 6px;
+  }
+  .comment-row p { margin: 0; font-size: 0.9em; white-space: pre-line; }
+  .no-comment { font-size: 0.85em; color: #999; padding: 6px 0; }
+
+  .toolbar-right { text-align: right; margin-bottom: 8px; }
+  .toolbar-right button {
+    background: white; border: 1.5px solid var(--main-color); color: var(--main-color);
+    padding: 5px 12px; border-radius: 6px; font-size: 0.82em; cursor: pointer;
+  }
 </style>
 </head>
 <body>
@@ -106,7 +148,7 @@
 
     <div class="panel">
       <h2>ドメイン別スコア(%)</h2>
-      <canvas id="domainChart" height="260"></canvas>
+      <canvas id="domainChart" height="320"></canvas>
     </div>
 
     <div class="panel">
@@ -117,12 +159,21 @@
       </table>
       <p style="font-size:0.8em;color:#666;">スコアは「確定」ステータスの班のみを対象に、AGREE II使用の手引きに準拠した計算式((獲得評点−最低評点)/(最高評点−最低評点)×100)で算出しています。</p>
     </div>
+
+    <div class="panel">
+      <h2>項目ごとのコメント</h2>
+      <div class="toolbar-right">
+        <button id="expandAllBtn">すべて開く</button>
+        <button id="collapseAllBtn">すべて閉じる</button>
+      </div>
+      <div id="commentsContainer"></div>
+    </div>
   </div>
 </div>
 
 <script>
 // ==== 設定: デプロイ後、あなたのGAS Web AプリのURLに書き換えてください ====
-var API_URL = "https://script.google.com/macros/s/AKfycbyaKp-ytpBpi_LH2-t7tfJDAvouv8wEyMVfTp1rI8wxCcttJzr_tJWSBjcXfilCnx2vfg/exec";
+var API_URL = "YOUR_WEB_APP_URL_HERE";
 
 var DOMAIN_DEFS = [
   { name: "領域1 対象と目的", items: [1, 2, 3] },
@@ -132,6 +183,33 @@ var DOMAIN_DEFS = [
   { name: "領域5 適用可能性", items: [18, 19, 20, 21] },
   { name: "領域6 編集の独立性", items: [22, 23] }
 ];
+
+// コメント一覧表示のための項目本文(Minds AGREEⅡ日本語訳 2022年9月改訂 準拠)
+var ITEM_TEXTS = {
+  1: "ガイドライン全体の目的が具体的に記載されている。",
+  2: "ガイドラインが取り扱う健康上の問題が具体的に記載されている。",
+  3: "ガイドラインの適用が想定される対象集団(患者、一般市民など)が具体的に記載されている。",
+  4: "ガイドライン作成グループには、関係する全ての専門家グループの代表者が加わっている。",
+  5: "対象集団(患者、一般市民など)の価値観や希望が調べられた。",
+  6: "対象となるガイドラインの利用者が明確に定義されている。",
+  7: "エビデンスを検索するために系統的な方法が用いられている。",
+  8: "エビデンスの選択基準が明確に記載されている。",
+  9: "エビデンス総体(body of evidence)の強さと限界が明確に記載されている。",
+  10: "推奨を作成する方法が明確に記載されている。",
+  11: "推奨の作成にあたって、健康上の益、副作用、リスクが考慮されている。",
+  12: "推奨とそれを支持するエビデンスとの対応関係が明確である。",
+  13: "ガイドラインの公表に先立って、専門家による外部評価がなされている。",
+  14: "ガイドラインの改訂手続きが示されている。",
+  15: "推奨が具体的であり、曖昧でない。",
+  16: "患者の状態や健康上の問題に応じて、異なる選択肢が明確に示されている。",
+  17: "重要な推奨が容易に見つけられる。",
+  18: "ガイドラインの適用にあたっての促進要因と阻害要因が記載されている。",
+  19: "どのように推奨を適用するかについての助言・ツールを提供している。",
+  20: "推奨の適用に対する潜在的な資源の影響が考慮されている。",
+  21: "ガイドラインにモニタリングや監査のための基準が示されている。",
+  22: "資金提供者の見解が、ガイドラインの内容に影響していない。",
+  23: "ガイドライン作成グループメンバーの利益相反が記録され、適切な対応がなされている。"
+};
 
 var chartInstance = null;
 
@@ -169,6 +247,7 @@ function render(config, responses) {
 
   renderDomainChart(domainScoresByGroup, combinedScores);
   renderDomainTable(domainScoresByGroup, combinedScores);
+  renderComments(responses);
 }
 
 function renderOverallTable(responses) {
@@ -238,31 +317,46 @@ function renderDomainChart(domainScoresByGroup, combinedScores) {
   var labels = DOMAIN_DEFS.map(function (d) { return d.name; });
 
   var datasets = domainScoresByGroup.map(function (g, idx) {
+    var color = colorForIndex(idx, 1);
     return {
-      label: g.group + '班',
+      label: g.group + '班' + (g.status === '確定' ? '' : '(下書き)'),
       data: labels.map(function (l) { return g.scores[l]; }),
-      backgroundColor: colorForIndex(idx, 0.5),
-      borderColor: colorForIndex(idx, 1),
-      borderWidth: 1
+      backgroundColor: colorForIndex(idx, 0.12),
+      borderColor: color,
+      borderWidth: g.status === '確定' ? 2 : 1,
+      borderDash: g.status === '確定' ? [] : [4, 3],
+      pointBackgroundColor: color,
+      pointRadius: 3
     };
   });
 
   datasets.push({
     label: '合計(確定済み班)',
     data: labels.map(function (l) { return combinedScores[l]; }),
-    backgroundColor: 'rgba(44,95,138,0.85)',
+    backgroundColor: 'rgba(44,95,138,0.25)',
     borderColor: '#2c5f8a',
-    borderWidth: 2
+    borderWidth: 3,
+    pointBackgroundColor: '#2c5f8a',
+    pointRadius: 4
   });
 
   if (chartInstance) chartInstance.destroy();
   chartInstance = new Chart(ctx, {
-    type: 'bar',
+    type: 'radar',
     data: { labels: labels, datasets: datasets },
     options: {
       responsive: true,
-      scales: { y: { beginAtZero: true, max: 100, title: { display: true, text: 'スコア(%)' } } },
-      plugins: { legend: { position: 'bottom' } }
+      plugins: { legend: { position: 'bottom' } },
+      scales: {
+        r: {
+          angleLines: { color: 'rgba(216,222,229,0.8)' },
+          grid: { color: 'rgba(216,222,229,0.8)' },
+          pointLabels: { font: { size: 11 }, color: '#444' },
+          suggestedMin: 0,
+          suggestedMax: 100,
+          ticks: { stepSize: 20, backdropColor: 'transparent', color: '#999' }
+        }
+      }
     }
   });
 }
@@ -296,6 +390,73 @@ function renderDomainTable(domainScoresByGroup, combinedScores) {
   body.appendChild(trCombined);
 }
 
+/**
+ * 項目(1〜23)ごとに、各班の評点とコメントをアコーディオンで表示する。
+ */
+function renderComments(responses) {
+  var container = document.getElementById('commentsContainer');
+  container.innerHTML = '';
+
+  if (responses.length === 0) {
+    container.innerHTML = '<p class="no-comment">まだ回答がありません。</p>';
+    return;
+  }
+
+  DOMAIN_DEFS.forEach(function (domain) {
+    var domainHeading = document.createElement('div');
+    domainHeading.style.fontWeight = 'bold';
+    domainHeading.style.color = 'var(--main-color)';
+    domainHeading.style.margin = '14px 0 6px';
+    domainHeading.textContent = domain.name;
+    container.appendChild(domainHeading);
+
+    domain.items.forEach(function (itemN) {
+      var rowsWithComment = responses.filter(function (r) {
+        var c = r['項目' + itemN + '_コメント'];
+        return c && String(c).trim() !== '';
+      });
+      var scores = responses
+        .map(function (r) { return r['項目' + itemN + '_評点']; })
+        .filter(function (v) { return v !== '' && v !== undefined && v !== null; })
+        .map(Number);
+      var avg = scores.length ? (scores.reduce(function (a, b) { return a + b; }, 0) / scores.length).toFixed(1) : '-';
+
+      var item = document.createElement('div');
+      item.className = 'accordion-item';
+
+      var header = document.createElement('button');
+      header.className = 'accordion-header';
+      header.type = 'button';
+      header.innerHTML =
+        '<span><span class="num">項目' + itemN + '</span>' + escapeHtml(ITEM_TEXTS[itemN]) + '</span>' +
+        '<span class="meta">平均評点 ' + avg + '/7 ・ コメント ' + rowsWithComment.length + '件 <span class="accordion-arrow">▾</span></span>';
+      header.addEventListener('click', function () {
+        item.classList.toggle('open');
+      });
+
+      var body = document.createElement('div');
+      body.className = 'accordion-body';
+      if (rowsWithComment.length === 0) {
+        body.innerHTML = '<p class="no-comment">コメントは記入されていません。</p>';
+      } else {
+        rowsWithComment.forEach(function (r) {
+          var row = document.createElement('div');
+          row.className = 'comment-row';
+          var score = r['項目' + itemN + '_評点'];
+          row.innerHTML =
+            '<div class="who"><span class="score-badge">' + escapeHtml(score) + '/7</span>' + escapeHtml(r['班']) + '班</div>' +
+            '<p>' + escapeHtml(r['項目' + itemN + '_コメント']) + '</p>';
+          body.appendChild(row);
+        });
+      }
+
+      item.appendChild(header);
+      item.appendChild(body);
+      container.appendChild(item);
+    });
+  });
+}
+
 function colorForIndex(idx, alpha) {
   var palette = [
     [231, 122, 31], [76, 149, 108], [155, 89, 182], [52, 152, 219]
@@ -313,11 +474,28 @@ function escapeHtml(v) {
 
 document.getElementById('reloadBtn').addEventListener('click', loadDashboard);
 
+document.getElementById('expandAllBtn').addEventListener('click', function () {
+  document.querySelectorAll('#commentsContainer .accordion-item').forEach(function (el) { el.classList.add('open'); });
+});
+document.getElementById('collapseAllBtn').addEventListener('click', function () {
+  document.querySelectorAll('#commentsContainer .accordion-item').forEach(function (el) { el.classList.remove('open'); });
+});
+
 document.getElementById('pdfBtn').addEventListener('click', function () {
   var btn = this;
   btn.disabled = true;
   btn.textContent = 'PDF作成中...';
   var target = document.getElementById('pdfArea');
+
+  // コメントのアコーディオンが閉じたままだとPDFに文章が写らないため、
+  // 撮影前に一旦すべて開き、撮影後に元の開閉状態へ戻す。
+  var accordionItems = document.querySelectorAll('#commentsContainer .accordion-item');
+  var previouslyOpen = [];
+  accordionItems.forEach(function (el) {
+    previouslyOpen.push(el.classList.contains('open'));
+    el.classList.add('open');
+  });
+
   html2canvas(target, { scale: 2 }).then(function (canvas) {
     var imgData = canvas.toDataURL('image/png');
     var jsPDFLib = window.jspdf.jsPDF;
@@ -331,6 +509,9 @@ document.getElementById('pdfBtn').addEventListener('click', function () {
     alert('PDFの作成に失敗しました: ' + err);
     console.error(err);
   }).finally(function () {
+    accordionItems.forEach(function (el, i) {
+      if (!previouslyOpen[i]) el.classList.remove('open');
+    });
     btn.disabled = false;
     btn.textContent = 'PDFで保存';
   });

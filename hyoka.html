@@ -133,8 +133,20 @@
   }
   .comment-label { font-size: 0.8em; color: #666; margin-bottom: 4px; display: block; }
 
-  .recommend-options { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 8px; }
+  .recommend-options { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 8px; align-items: center; }
   .recommend-options label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+
+  .clear-btn {
+    font-size: 0.75em;
+    color: #888;
+    background: white;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 2px 10px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .clear-btn:hover { background: #f2f2f2; }
 
   .actions {
     position: sticky;
@@ -193,6 +205,9 @@
           <div class="scale-options" id="overallQualityScale"></div>
           <span class="scale-label-right">最も高い質</span>
         </div>
+        <div style="text-align:right;">
+          <button type="button" class="clear-btn" id="clearOverallQuality">クリア</button>
+        </div>
       </div>
       <div class="item-block">
         <div class="item-text">2. このガイドラインの使用を推奨する。</div>
@@ -200,6 +215,7 @@
           <label><input type="radio" name="overallRecommend" value="推奨しない"> 推奨しない</label>
           <label><input type="radio" name="overallRecommend" value="条件付きで推奨する"> 条件付きで推奨する(要修正)</label>
           <label><input type="radio" name="overallRecommend" value="推奨する"> 推奨する</label>
+          <button type="button" class="clear-btn" id="clearOverallRecommend">クリア</button>
         </div>
         <span class="comment-label">コメント(任意)</span>
         <textarea id="overallRecommendComment"></textarea>
@@ -217,7 +233,7 @@
 
 <script>
 // ==== 設定: デプロイ後、あなたのGAS Web AプリのURLに書き換えてください ====
-var API_URL = "https://script.google.com/macros/s/AKfycbyaKp-ytpBpi_LH2-t7tfJDAvouv8wEyMVfTp1rI8wxCcttJzr_tJWSBjcXfilCnx2vfg/exec";
+var API_URL = "YOUR_WEB_APP_URL_HERE";
 
 // ==== AGREE II 項目データ (Minds AGREEⅡ日本語訳 2022年9月改訂 準拠) ====
 var DOMAINS = [
@@ -337,6 +353,21 @@ function renderForm() {
       scaleRow.appendChild(options);
       scaleRow.appendChild(right);
       block.appendChild(scaleRow);
+
+      var clearRow = document.createElement('div');
+      clearRow.style.textAlign = 'right';
+      var clearBtn = document.createElement('button');
+      clearBtn.type = 'button';
+      clearBtn.className = 'clear-btn';
+      clearBtn.textContent = 'クリア';
+      (function (itemN) {
+        clearBtn.addEventListener('click', function () {
+          document.querySelectorAll('input[name="item' + itemN + '_score"]').forEach(function (el) { el.checked = false; });
+          markDirty();
+        });
+      })(item.n);
+      clearRow.appendChild(clearBtn);
+      block.appendChild(clearRow);
 
       var commentLabel = document.createElement('span');
       commentLabel.className = 'comment-label';
@@ -515,6 +546,16 @@ function sendData(action, useBeacon) {
 }
 
 document.getElementById('groupSelect').addEventListener('change', onGroupChange);
+
+document.getElementById('clearOverallQuality').addEventListener('click', function () {
+  document.querySelectorAll('input[name="overallQuality"]').forEach(function (el) { el.checked = false; });
+  markDirty();
+});
+
+document.getElementById('clearOverallRecommend').addEventListener('click', function () {
+  document.querySelectorAll('input[name="overallRecommend"]').forEach(function (el) { el.checked = false; });
+  markDirty();
+});
 
 document.getElementById('saveBtn').addEventListener('click', function () {
   if (!currentGroup) return;

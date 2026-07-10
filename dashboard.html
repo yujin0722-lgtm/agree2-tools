@@ -150,6 +150,25 @@
     font-size: 0.85em;
     color: #666;
   }
+
+  .history-selector label { font-weight: bold; display: block; margin-bottom: 6px; font-size: 0.92em; }
+  .history-selector select {
+    width: 100%;
+    font-size: 1em;
+    padding: 8px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background: white;
+  }
+  .history-badge {
+    display: inline-block;
+    margin-top: 8px;
+    font-size: 0.8em;
+    color: var(--accent-color);
+    background: #fef3e7;
+    padding: 3px 10px;
+    border-radius: 10px;
+  }
 </style>
 </head>
 <body>
@@ -169,6 +188,14 @@
 <div class="container">
   <div id="loadingMsg">データを読み込んでいます...</div>
   <div id="errorMsg"></div>
+
+  <div class="panel history-selector">
+    <label for="historySelect">表示するデータ</label>
+    <select id="historySelect">
+      <option value="">現在進行中の勉強会</option>
+    </select>
+    <div id="historyBadge" class="history-badge" style="display:none;"></div>
+  </div>
 
   <div id="pdfArea" style="display:none;">
     <div class="pdf-title-block">
@@ -214,7 +241,7 @@
 
 <script>
 // ==== 設定: デプロイ後、あなたのGAS Web AプリのURLに書き換えてください ====
-var API_URL = "https://script.google.com/macros/s/AKfycbyaKp-ytpBpi_LH2-t7tfJDAvouv8wEyMVfTp1rI8wxCcttJzr_tJWSBjcXfilCnx2vfg/exec";
+var API_URL = "YOUR_WEB_APP_URL_HERE";
 
 var DOMAIN_DEFS = [
   { name: "領域1 対象と目的", items: [1, 2, 3] },
@@ -274,16 +301,86 @@ function loadDashboard() {
     });
 }
 
-function render(config, responses) {
+/**
+ * 過去にアーカイブされた勉強会の一覧を取得し、「表示するデータ」のプルダウンに追加する。
+ */
+function loadHistoryList() {
+  fetch(API_URL + '?action=historyList')
+    .then(function (res) { return res.json(); })
+    .then(function (data) {
+      if (!data.ok) throw new Error(data.error || 'historyList failed');
+      var select = document.getElementById('historySelect');
+      // 「現在進行中の勉強会」以外の選択肢を作り直す
+      while (select.options.length > 1) select.remove(1);
+      data.groups.forEach(function (g) {
+        var opt = document.createElement('option');
+        opt.value = g.key;
+        var dateLabel = g.archivedAt ? new Date(g.archivedAt).toLocaleString('ja-JP') : '';
+        opt.textContent = dateLabel + ' - ' + (g.guidelineName || '(名称未設定)') + ' (' + g.groupCount + '班)';
+        select.appendChild(opt);
+      });
+    })
+    .catch(function (err) {
+      console.error('履歴一覧の読み込みに失敗しました', err);
+    });
+}
+
+/**
+ * 指定したキーの過去の勉強会結果を読み込んで表示する。
+ */
+function loadHistoryDetail(key) {
+  document.getElementById('loadingMsg').style.display = 'block';
+  document.getElementById('errorMsg').style.display = 'none';
+  document.getElementById('pdfArea').style.display = 'none';
+
+  fetch(API_URL + '?action=historyDetail&key=' + encodeURIComponent(key))
+    .then(function (res) { return res.json(); })
+    .then(function (data) {
+      if (!data.ok) throw new Error(data.error || 'historyDetail failed');
+      if (!data.data.exists) throw new Error('該当する履歴が見つかりませんでした。');
+      var config = { guidelineName: data.data.guidelineName, groupCount: data.data.groupCount };
+      render(config, data.data.responses, { archivedAt: data.data.archivedAt });
+    })
+    .catch(function (err) {
+      document.getElementById('loadingMsg').style.display = 'none';
+      var errEl = document.getElementById('errorMsg');
+      errEl.style.display = 'block';
+      errEl.textContent = '過去の記録の読み込みに失敗しました。(' + err + ')';
+      console.error(err);
+    });
+}
+
+function loadCurrentSelection() {
+  var key = document.getElementById('historySelect').value;
+  if (key) {
+    loadHistoryDetail(key);
+  } else {
+    loadDashboard();
+  }
+}
+
+function render(config, responses, historyInfo) {
+  var isHistory = !!(historyInfo && historyInfo.archivedAt);
+
   document.getElementById('guidelineLine').textContent =
-    '評価対象ガイドライン: ' + (config.guidelineName || '(未設定)') + ' / 班数: ' + config.groupCount;
+    '評価対象ガイドライン: ' + (config.guidelineName || '(未設定)') + ' / 班数: ' + config.groupCount +
+    (isHistory ? ' (過去の記録を表示中)' : '');
 
   // PDF出力範囲(#pdfArea)にもガイドライン名を表示する。
   // ヘッダーの#guidelineLineはPDFの撮影対象(#pdfArea)の外側にあるため、
   // ここに表示しないとPDFにガイドライン名が一切写らない。
   document.getElementById('pdfGuidelineName').textContent = config.guidelineName || '(ガイドライン名未設定)';
-  document.getElementById('pdfTitleMeta').textContent =
-    '班数: ' + config.groupCount + ' / データ取得日時: ' + new Date().toLocaleString('ja-JP');
+  document.getElementById('pdfTitleMeta').textContent = isHistory
+    ? '班数: ' + config.groupCount + ' / アーカイブ日時: ' + new Date(historyInfo.archivedAt).toLocaleString('ja-JP')
+    : '班数: ' + config.groupCount + ' / データ取得日時: ' + new Date().toLocaleString('ja-JP');
+
+  var historyBadge = document.getElementById('historyBadge');
+  if (isHistory) {
+    historyBadge.textContent = '過去の記録を表示しています(' + new Date(historyInfo.archivedAt).toLocaleString('ja-JP') + ' にアーカイブ)';
+    historyBadge.style.display = 'inline-block';
+  } else {
+    historyBadge.style.display = 'none';
+  }
 
   document.getElementById('loadingMsg').style.display = 'none';
   document.getElementById('pdfArea').style.display = 'block';
@@ -613,7 +710,12 @@ function escapeHtml(v) {
   });
 }
 
-document.getElementById('reloadBtn').addEventListener('click', loadDashboard);
+document.getElementById('reloadBtn').addEventListener('click', function () {
+  loadHistoryList();
+  loadCurrentSelection();
+});
+
+document.getElementById('historySelect').addEventListener('change', loadCurrentSelection);
 
 document.getElementById('expandAllBtn').addEventListener('click', function () {
   document.querySelectorAll('#commentsContainer .accordion-item').forEach(function (el) { el.classList.add('open'); });
@@ -659,6 +761,7 @@ document.getElementById('pdfBtn').addEventListener('click', function () {
 });
 
 loadDashboard();
+loadHistoryList();
 </script>
 
 </body>

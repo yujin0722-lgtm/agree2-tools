@@ -71,7 +71,7 @@
   #refreshBtn { background: var(--danger-color); color: white; }
   button:disabled { opacity: 0.6; cursor: not-allowed; }
 
-  #configMsg, #refreshMsg, #sampleMsg, #clearMsg, #clearHistoryMsg { margin-top: 10px; font-size: 0.9em; padding: 8px 10px; border-radius: 6px; display: none; }
+  #configMsg, #refreshMsg, #sampleMsg, #clearMsg, #clearHistoryMsg, #historyListMsg { margin-top: 10px; font-size: 0.9em; padding: 8px 10px; border-radius: 6px; display: none; }
   .msg-ok { background: #e2f5e9; color: #1f7a3d; display: block !important; }
   .msg-error { background: #fdeaea; color: var(--danger-color); display: block !important; }
 
@@ -154,8 +154,19 @@
     <div id="clearMsg"></div>
   </div>
 
+  <div class="panel">
+    <h2>5. 過去の勉強会の履歴を管理する</h2>
+    <p class="hint">練習で作った記録や、誤って作成してしまった履歴だけを個別に削除できます。ダッシュボードの「表示するデータ」からも、ここに並ぶ過去の勉強会の結果を見返せます。</p>
+    <table id="historyTable">
+      <thead><tr><th>アーカイブ日時</th><th>ガイドライン名</th><th>班数</th><th></th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <button id="reloadHistoryBtn" style="margin-top:12px; background:white; border:1.5px solid var(--main-color); color:var(--main-color);">履歴を再読み込み</button>
+    <div id="historyListMsg"></div>
+  </div>
+
   <div class="panel danger">
-    <h2>5. 評価履歴をすべて削除する(特殊操作)</h2>
+    <h2>6. 評価履歴をすべて削除する(特殊操作)</h2>
     <p>過去のすべての勉強会の記録(「評価履歴」シートの全データ)を完全に削除します。<strong>通常の運用では使いません。</strong>間違って削除した記録を確認したい場合など、非常に特殊な理由がある場合のみ実行してください。この操作は取り消せません。</p>
     <label for="clearHistoryConfirmInput">実行するには、下の欄に「履歴削除」と入力してください</label>
     <input type="text" id="clearHistoryConfirmInput" placeholder="履歴削除">
@@ -167,7 +178,7 @@
 
 <script>
 // ==== 設定: デプロイ後、あなたのGAS Web AプリのURLに書き換えてください ====
-var API_URL = "https://script.google.com/macros/s/AKfycbyaKp-ytpBpi_LH2-t7tfJDAvouv8wEyMVfTp1rI8wxCcttJzr_tJWSBjcXfilCnx2vfg/exec";
+var API_URL = "YOUR_WEB_APP_URL_HERE";
 
 var latestResponses = [];
 var latestGroupCount = 4;
@@ -370,6 +381,7 @@ document.getElementById('refreshBtn').addEventListener('click', function () {
       if (!data.ok) throw new Error(data.error || 'refresh failed');
       showMsg('refreshMsg', data.result.message, false);
       loadCurrentState();
+      loadHistoryGroups();
     })
     .catch(function (err) {
       showMsg('refreshMsg', '実行に失敗しました。(' + err + ')', true);
@@ -413,7 +425,81 @@ clearWithoutHistoryBtn.addEventListener('click', function () {
     .finally(function () { btn.disabled = (clearConfirmInput.value.trim() !== '削除'); });
 });
 
-// ---- 5. 評価履歴をすべて削除する(特殊操作) ----
+// ---- 5. 過去の勉強会の履歴を管理する ----
+function loadHistoryGroups() {
+  fetch(API_URL + '?action=historyList')
+    .then(function (res) { return res.json(); })
+    .then(function (data) {
+      if (!data.ok) throw new Error(data.error || 'load failed');
+      renderHistoryTable(data.groups);
+    })
+    .catch(function (err) {
+      showMsg('historyListMsg', '履歴一覧の読み込みに失敗しました。(' + err + ')', true);
+      console.error(err);
+    });
+}
+
+function renderHistoryTable(groups) {
+  var tbody = document.querySelector('#historyTable tbody');
+  tbody.innerHTML = '';
+  if (!groups || groups.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="4">まだ履歴がありません。</td></tr>';
+    return;
+  }
+  groups.forEach(function (g) {
+    var dateLabel = g.archivedAt ? new Date(g.archivedAt).toLocaleString('ja-JP') : '-';
+    var nameLabel = g.guidelineName || '(名称未設定)';
+
+    var tr = document.createElement('tr');
+    var tdDate = document.createElement('td');
+    tdDate.textContent = dateLabel;
+    var tdName = document.createElement('td');
+    tdName.textContent = nameLabel;
+    var tdCount = document.createElement('td');
+    tdCount.textContent = g.groupCount + '班';
+    var tdAction = document.createElement('td');
+    var delBtn = document.createElement('button');
+    delBtn.textContent = '削除';
+    delBtn.style.cssText = 'background:var(--danger-color); color:white; font-size:0.82em; padding:5px 12px;';
+    delBtn.addEventListener('click', function () {
+      deleteHistoryEntry(g.key, dateLabel + ' / ' + nameLabel, delBtn);
+    });
+    tdAction.appendChild(delBtn);
+
+    tr.appendChild(tdDate);
+    tr.appendChild(tdName);
+    tr.appendChild(tdCount);
+    tr.appendChild(tdAction);
+    tbody.appendChild(tr);
+  });
+}
+
+function deleteHistoryEntry(key, label, btn) {
+  var ok = confirm('「' + label + '」の履歴を削除します。この操作は取り消せません。よろしいですか？');
+  if (!ok) return;
+
+  btn.disabled = true;
+  fetch(API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ action: 'deleteHistoryGroup', key: key })
+  })
+    .then(function (res) { return res.json(); })
+    .then(function (data) {
+      if (!data.ok) throw new Error(data.error || 'delete failed');
+      showMsg('historyListMsg', '「' + label + '」の履歴を削除しました。', false);
+      loadHistoryGroups();
+    })
+    .catch(function (err) {
+      showMsg('historyListMsg', '削除に失敗しました。(' + err + ')', true);
+      console.error(err);
+      btn.disabled = false;
+    });
+}
+
+document.getElementById('reloadHistoryBtn').addEventListener('click', loadHistoryGroups);
+
+// ---- 6. 評価履歴をすべて削除する(特殊操作) ----
 var clearHistoryConfirmInput = document.getElementById('clearHistoryConfirmInput');
 var clearHistoryBtn = document.getElementById('clearHistoryBtn');
 
@@ -439,6 +525,7 @@ clearHistoryBtn.addEventListener('click', function () {
       if (!data.ok) throw new Error(data.error || 'clear failed');
       showMsg('clearHistoryMsg', data.result.message, false);
       clearHistoryConfirmInput.value = '';
+      loadHistoryGroups();
     })
     .catch(function (err) {
       showMsg('clearHistoryMsg', '削除に失敗しました。(' + err + ')', true);
@@ -448,6 +535,7 @@ clearHistoryBtn.addEventListener('click', function () {
 });
 
 loadCurrentState();
+loadHistoryGroups();
 </script>
 
 </body>

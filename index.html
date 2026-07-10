@@ -81,6 +81,22 @@
     padding-top: 16px;
     border-top: 1px solid var(--border-color);
   }
+
+  .admin-area {
+    margin-top: 8px;
+    text-align: center;
+  }
+  .admin-link {
+    display: inline-block;
+    font-size: 0.8em;
+    color: #888;
+    background: white;
+    border: 1px solid var(--border-color);
+    border-radius: 20px;
+    padding: 6px 16px;
+    text-decoration: none;
+  }
+  .admin-link:hover { background: #f0f0f0; color: #555; }
 </style>
 </head>
 <body>
@@ -128,9 +144,22 @@
     </ol>
   </div>
 
+  <div class="panel">
+    <h3>主催者の方へ(管理画面)</h3>
+    <ol>
+      <li>勉強会を始める前に、管理画面で「評価対象のガイドライン名」と「班数(2〜4)」を設定し、「この内容で保存する」を押します。評価フォーム・ダッシュボードの表示にすぐ反映されます。</li>
+      <li>勉強会の途中で班数を増減したい場合も、同じ画面から変更できます。班数を減らす場合は、範囲外になる班のデータを削除するかどうかの確認が表示されます。</li>
+      <li>「現在の回答状況」で、班ごとのステータス(下書き/確定)を一覧で確認できます。</li>
+      <li>1回の勉強会が終わったら、「履歴に保存して新しい勉強会を開始する」を押してください。今回の回答は「評価履歴」シートに保存され、回答エリアがクリアされて次の勉強会の準備が整います。</li>
+    </ol>
+  </div>
+
   <p class="note">
-    勉強会の設定(ガイドライン名・班数の変更)や、新しい勉強会を始める際のリフレッシュ操作は、別途お渡ししている管理画面(kanri.html)から行ってください。参加者に共有するページではないため、このページにはリンクを置いていません。
+    管理画面は主催者が設定変更・勉強会のリフレッシュを行うためのページです。参加者が誤って操作しないよう、通常の案内では下のリンクを共有しないでください。
   </p>
+  <div class="admin-area">
+    <a class="admin-link" href="kanri.html">管理画面(主催者専用)を開く</a>
+  </div>
 
 </div>
 

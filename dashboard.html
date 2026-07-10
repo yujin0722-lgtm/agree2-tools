@@ -127,6 +127,29 @@
     background: white; border: 1.5px solid var(--main-color); color: var(--main-color);
     padding: 5px 12px; border-radius: 6px; font-size: 0.82em; cursor: pointer;
   }
+
+  .pdf-title-block {
+    margin-bottom: 20px;
+    padding-bottom: 14px;
+    border-bottom: 3px solid var(--main-color);
+  }
+  .pdf-title-label {
+    font-size: 0.8em;
+    font-weight: bold;
+    color: var(--accent-color);
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+  }
+  .pdf-title-block h1 {
+    margin: 0;
+    font-size: 1.5em;
+    color: var(--main-color);
+  }
+  .pdf-title-meta {
+    margin: 6px 0 0;
+    font-size: 0.85em;
+    color: #666;
+  }
 </style>
 </head>
 <body>
@@ -148,6 +171,12 @@
   <div id="errorMsg"></div>
 
   <div id="pdfArea" style="display:none;">
+    <div class="pdf-title-block">
+      <div class="pdf-title-label">AGREE II 評価結果</div>
+      <h1 id="pdfGuidelineName"></h1>
+      <p class="pdf-title-meta" id="pdfTitleMeta"></p>
+    </div>
+
     <div class="panel">
       <h2>班ごとの全体評価</h2>
       <table id="overallTable">
@@ -185,7 +214,7 @@
 
 <script>
 // ==== 設定: デプロイ後、あなたのGAS Web AプリのURLに書き換えてください ====
-var API_URL = "https://script.google.com/macros/s/AKfycbyaKp-ytpBpi_LH2-t7tfJDAvouv8wEyMVfTp1rI8wxCcttJzr_tJWSBjcXfilCnx2vfg/exec";
+var API_URL = "YOUR_WEB_APP_URL_HERE";
 
 var DOMAIN_DEFS = [
   { name: "領域1 対象と目的", items: [1, 2, 3] },
@@ -248,6 +277,13 @@ function loadDashboard() {
 function render(config, responses) {
   document.getElementById('guidelineLine').textContent =
     '評価対象ガイドライン: ' + (config.guidelineName || '(未設定)') + ' / 班数: ' + config.groupCount;
+
+  // PDF出力範囲(#pdfArea)にもガイドライン名を表示する。
+  // ヘッダーの#guidelineLineはPDFの撮影対象(#pdfArea)の外側にあるため、
+  // ここに表示しないとPDFにガイドライン名が一切写らない。
+  document.getElementById('pdfGuidelineName').textContent = config.guidelineName || '(ガイドライン名未設定)';
+  document.getElementById('pdfTitleMeta').textContent =
+    '班数: ' + config.groupCount + ' / データ取得日時: ' + new Date().toLocaleString('ja-JP');
 
   document.getElementById('loadingMsg').style.display = 'none';
   document.getElementById('pdfArea').style.display = 'block';

@@ -167,7 +167,7 @@
 
 <script>
 // ==== 設定: デプロイ後、あなたのGAS Web AプリのURLに書き換えてください ====
-var API_URL = "https://script.google.com/macros/s/AKfycbyaKp-ytpBpi_LH2-t7tfJDAvouv8wEyMVfTp1rI8wxCcttJzr_tJWSBjcXfilCnx2vfg/exec";
+var API_URL = "YOUR_WEB_APP_URL_HERE";
 
 var latestResponses = [];
 var latestGroupCount = 4;
@@ -368,7 +368,7 @@ document.getElementById('refreshBtn').addEventListener('click', function () {
     .then(function (res) { return res.json(); })
     .then(function (data) {
       if (!data.ok) throw new Error(data.error || 'refresh failed');
-      showMsg('refreshMsg', data.result.message + ' 次の勉強会の準備ができました。ガイドライン名を更新したい場合は上の「1. 勉強会の設定」から変更してください。', false);
+      showMsg('refreshMsg', data.result.message, false);
       loadCurrentState();
     })
     .catch(function (err) {
